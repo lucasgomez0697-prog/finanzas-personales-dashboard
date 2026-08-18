@@ -1,3 +1,5 @@
+import AutoRefresh from "./auto-refresh";
+
 type Card = {
   bank: string;
   card_name?: string;
@@ -100,6 +102,7 @@ export default async function Home() {
   if (!data) {
     return (
       <main className="shell">
+        <AutoRefresh />
         <section className="empty-state">
           <span className="eyebrow">Finanzas Personales</span>
           <h1>Dashboard pendiente de configuración</h1>
@@ -121,6 +124,7 @@ export default async function Home() {
 
   return (
     <main className="shell">
+      <AutoRefresh />
       <header className="hero">
         <div>
           <span className="eyebrow">Finanzas Personales</span>
@@ -208,7 +212,7 @@ export default async function Home() {
         </section>
       ) : null}
 
-      <footer>Dashboard personal · Supabase como fuente oficial · Actualización automática</footer>
+      <footer>Dashboard personal · Supabase como fuente oficial · Actualización automática cada 60 segundos</footer>
     </main>
   );
 }
