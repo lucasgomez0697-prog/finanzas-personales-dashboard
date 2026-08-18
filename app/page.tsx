@@ -23,6 +23,20 @@ type Tx = {
   transaction_type: string;
 };
 
+type Business = {
+  name: string;
+  units_available_min?: number;
+  units_available_max?: number;
+  units_sold?: number;
+  commission_per_sale?: number;
+  currency?: string;
+  planned_ad_spend_total?: number;
+  user_planned_contribution?: number;
+  partner_planned_contribution?: number;
+  ad_spend_currency?: string;
+  status?: string;
+};
+
 type DashboardData = {
   generated_at: string;
   snapshot: {
@@ -42,10 +56,12 @@ type DashboardData = {
   monthly_by_category: Record<string, number>;
   goals: Goal[];
   recent_transactions: Tx[];
+  business: Business[];
 };
 
 const pyg = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const money = (value?: number) => `Gs. ${pyg.format(Number(value || 0))}`;
+const number = (value?: number) => pyg.format(Number(value || 0));
 
 function env(name: string, translated?: string) {
   return process.env[name] || (translated ? process.env[translated] : undefined);
@@ -101,6 +117,7 @@ export default async function Home() {
   const maxCategory = Math.max(...categories.map(([, v]) => Number(v)), 1);
   const emergency = data.goals?.find((g) => g.name.toLowerCase().includes("emergencia"));
   const emergencyPct = emergency?.target_amount ? Math.min(100, (Number(emergency.current_amount || 0) / Number(emergency.target_amount)) * 100) : 0;
+  const business = data.business?.[0];
 
   return (
     <main className="shell">
@@ -175,6 +192,21 @@ export default async function Home() {
           </div>
         </article>
       </section>
+
+      {business ? (
+        <section className="panel business-panel">
+          <div className="panel-head">
+            <div><span className="eyebrow">Negocio inmobiliario</span><h2>{business.name}</h2></div>
+            <div className="status-pill">Separado de finanzas personales</div>
+          </div>
+          <div className="business-grid">
+            <div><span className="eyebrow">Casas en cartera</span><strong>{number(business.units_available_min)}–{number(business.units_available_max)}</strong></div>
+            <div><span className="eyebrow">Vendidas</span><strong>{number(business.units_sold)}</strong></div>
+            <div><span className="eyebrow">Comisión por venta</span><strong>{money(business.commission_per_sale)}</strong></div>
+            <div><span className="eyebrow">Pauta inicial</span><strong>USD {number(business.planned_ad_spend_total)}</strong><small>USD {number(business.user_planned_contribution)} vos + USD {number(business.partner_planned_contribution)} tu hermano</small></div>
+          </div>
+        </section>
+      ) : null}
 
       <footer>Dashboard personal · Supabase como fuente oficial · Actualización automática</footer>
     </main>
