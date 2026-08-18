@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function proxy(request: NextRequest) {
-  const user = process.env.DASHBOARD_USER;
-  const password = process.env.DASHBOARD_PASSWORD;
-  if (!user || !password) return new NextResponse("Dashboard no configurado", { status: 503 });
+  if (request.nextUrl.pathname === "/api/health") return NextResponse.next();
+
+  const user = process.env.DASHBOARD_USER || process.env.PANEL_DE_CONTROL_USUARIO;
+  const password = process.env.DASHBOARD_PASSWORD || process.env["CONTRASEÑA_DEL_PANEL_DE_CONTRASEÑANZA"];
+
+  if (!user || !password) {
+    return new NextResponse("Dashboard no configurado", { status: 503 });
+  }
 
   const auth = request.headers.get("authorization");
   if (auth?.startsWith("Basic ")) {
