@@ -140,7 +140,7 @@ export default async function Home() {
 
       <section className="metrics-grid metrics-grid-4">
         <Metric label="Liquidez actual" value={money(data.liquidity?.liquid_pyg || s.current_liquidity_pyg)} note="Efectivo disponible hoy" />
-        <Metric label="Hasta próximo cobro" value={money(cash.projected_after_fixed_pyg)} note={`${money(cash.fixed_due_before_next_income_pyg)} de fijos antes del ${shortDate(nextIncome?.next_date)}`} tone={cashTone} />
+        <Metric label="Caja proyectada al próximo cobro" value={money(cash.projected_after_fixed_pyg)} note={`${money(cash.fixed_due_before_next_income_pyg)} de fijos antes del ${shortDate(nextIncome?.next_date)}`} tone={cashTone} />
         <Metric label="Próximo cobro" value={money(nextIncome?.amount)} note={`${nextIncome?.name || "Ingreso"} · ${dateLabel(nextIncome?.next_date)}`} />
         <Metric label="Dinero libre estimado / mes" value={money(d.monthly_free_estimate_pyg)} note="Ingreso mensual − fijos brutos − gasto variable registrado" />
         <Metric label="Deuda total tarjetas" value={money(d.total_card_balance_pyg)} note="Itaú + Sudameris + Ueno + Continental" />
