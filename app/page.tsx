@@ -47,9 +47,13 @@ type DashboardData = {
 const pyg = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const money = (value?: number) => `Gs. ${pyg.format(Number(value || 0))}`;
 
+function env(name: string, translated?: string) {
+  return process.env[name] || (translated ? process.env[translated] : undefined);
+}
+
 async function getDashboard(): Promise<DashboardData | null> {
-  const url = process.env.SUPABASE_DASHBOARD_URL;
-  const key = process.env.DASHBOARD_API_KEY;
+  const url = env("SUPABASE_DASHBOARD_URL", "URL_DEL_PANEL_DE_CONTROL_DE_SUPARASE");
+  const key = env("DASHBOARD_API_KEY", "CLAVE_API_DEL_PANEL_DE_CONTACTO");
   if (!url || !key) return null;
 
   try {
