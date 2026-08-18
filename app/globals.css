@@ -34,10 +34,10 @@ body {
 .metric-card, .panel, .empty-state { border: 1px solid var(--border); background: linear-gradient(180deg, rgba(18,31,51,.94), rgba(13,24,40,.96)); border-radius: 20px; box-shadow: 0 18px 55px rgba(0,0,0,.18); }
 .metric-card { padding: 20px; min-height: 135px; display: flex; flex-direction: column; justify-content: space-between; }
 .metric-card strong { font-size: clamp(23px,3vw,34px); letter-spacing: -0.035em; margin: 10px 0 7px; }
-.metric-card small, .card-row small, .transaction small { color: var(--muted); display: block; font-size: 12px; }
+.metric-card small, .card-row small, .transaction small, .business-grid small { color: var(--muted); display: block; font-size: 12px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .panel { padding: 22px; min-width: 0; }
-.panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
 .panel h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.025em; }
 .stack { display: grid; gap: 14px; }
 .card-row, .category-row { background: rgba(3,10,20,.3); padding: 14px; border-radius: 14px; border: 1px solid rgba(148,163,184,.08); }
@@ -54,6 +54,11 @@ body {
 .transaction { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .transaction:last-child { border-bottom: 0; }
 .transaction strong { font-size: 13px; white-space: nowrap; }
+.business-panel { margin-top: 14px; }
+.business-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.business-grid > div { background: rgba(3,10,20,.3); padding: 16px; border-radius: 14px; border: 1px solid rgba(148,163,184,.08); }
+.business-grid strong { display: block; font-size: 22px; margin-top: 8px; letter-spacing: -.03em; }
+.business-grid small { margin-top: 6px; line-height: 1.4; }
 footer { color: #64748b; text-align: center; padding: 28px 0 0; font-size: 11px; }
 .empty-state { max-width: 680px; margin: 18vh auto 0; padding: 34px; }
 .empty-state h1 { font-size: 34px; letter-spacing: -.035em; margin: 8px 0 12px; }
@@ -62,11 +67,13 @@ footer { color: #64748b; text-align: center; padding: 28px 0 0; font-size: 11px;
 @media (max-width: 850px) {
   .metrics-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .two-col { grid-template-columns: 1fr; }
+  .business-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .hero { flex-direction: column; }
 }
 @media (max-width: 540px) {
   .shell { padding: 28px 14px 42px; }
-  .metrics-grid { grid-template-columns: 1fr; }
+  .metrics-grid, .business-grid { grid-template-columns: 1fr; }
   .metric-card { min-height: 115px; }
   .row-meta { flex-direction: column; }
+  .panel-head { align-items: flex-start; flex-direction: column; }
 }
