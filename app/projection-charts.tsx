@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 type DashboardData = any;
 
 const pyg = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -5,6 +9,16 @@ const money = (value?: number | null) => `Gs. ${pyg.format(Number(value || 0))}`
 
 function monthLabel(date: Date) {
   return date.toLocaleDateString("es-PY", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(".", "");
+}
+
+function exactDateLabel(value?: string | null) {
+  if (!value) return "—";
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function addMonths(date: Date, months: number) {
@@ -68,6 +82,7 @@ export function getProjectionSummary(data: DashboardData) {
 
     months.push({
       month: monthLabel(date),
+      date: date.toISOString().slice(0, 10),
       fixed,
       variableReserve,
       cushionTopup,
@@ -92,7 +107,10 @@ export function getProjectionSummary(data: DashboardData) {
   };
 }
 
-function LineChart({ rows, series, maxValue }: { rows: any[]; series: { key: string; label: string; stroke: string; dashed?: boolean }[]; maxValue?: number }) {
+type ChartSeries = { key: string; label: string; stroke: string; dashed?: boolean };
+
+function LineChart({ rows, series, maxValue }: { rows: any[]; series: ChartSeries[]; maxValue?: number }) {
+  const [hovered, setHovered] = useState<number | null>(null);
   const width = 900;
   const height = 300;
   const padX = 54;
@@ -104,10 +122,25 @@ function LineChart({ rows, series, maxValue }: { rows: any[]; series: { key: str
   const x = (i: number) => padX + (rows.length <= 1 ? 0 : (i / (rows.length - 1)) * plotW);
   const y = (value: number) => padTop + plotH - (Math.max(value, 0) / max) * plotH;
   const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const hoveredRow = hovered == null ? null : rows[hovered];
+
+  function nearestIndex(clientX: number, svg: SVGSVGElement) {
+    const rect = svg.getBoundingClientRect();
+    const svgX = ((clientX - rect.left) / rect.width) * width;
+    const ratio = Math.max(0, Math.min(1, (svgX - padX) / plotW));
+    return Math.round(ratio * Math.max(rows.length - 1, 0));
+  }
 
   return (
-    <div style={{ overflow: "hidden" }}>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Gráfico de tendencia financiera" style={{ width: "100%", height: "auto", display: "block" }}>
+    <div style={{ position: "relative", overflow: "hidden" }}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Gráfico de tendencia financiera"
+        style={{ width: "100%", height: "auto", display: "block", cursor: "crosshair" }}
+        onMouseMove={(event) => setHovered(nearestIndex(event.clientX, event.currentTarget))}
+        onMouseLeave={() => setHovered(null)}
+      >
         {ticks.map((t) => {
           const yy = padTop + plotH - t * plotH;
           return <g key={t}><line x1={padX} y1={yy} x2={width - padX} y2={yy} stroke="rgba(148,163,184,.14)" /><text x={8} y={yy + 4} fill="var(--muted)" fontSize="11">{pyg.format(Math.round(max * t / 100000) * 100000)}</text></g>;
@@ -116,8 +149,23 @@ function LineChart({ rows, series, maxValue }: { rows: any[]; series: { key: str
           const points = rows.map((r, i) => `${x(i)},${y(Number(r[s.key] || 0))}`).join(" ");
           return <polyline key={s.key} points={points} fill="none" stroke={s.stroke} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={s.dashed ? "9 8" : undefined} />;
         })}
-        {rows.map((r, i) => i % 2 === 0 || i === rows.length - 1 ? <text key={r.month} x={x(i)} y={height - 16} textAnchor="middle" fill="var(--muted)" fontSize="11">{r.month}</text> : null)}
+        {hovered != null ? <line x1={x(hovered)} y1={padTop} x2={x(hovered)} y2={padTop + plotH} stroke="rgba(226,232,240,.35)" strokeWidth="1" strokeDasharray="4 4" /> : null}
+        {hovered != null ? series.map((s) => <circle key={`dot-${s.key}`} cx={x(hovered)} cy={y(Number(rows[hovered]?.[s.key] || 0))} r="6" fill={s.stroke} stroke="var(--panel-2)" strokeWidth="3" />) : null}
+        {rows.map((r, i) => i % 2 === 0 || i === rows.length - 1 ? <text key={`${r.month}-${i}`} x={x(i)} y={height - 16} textAnchor="middle" fill="var(--muted)" fontSize="11">{r.month}</text> : null)}
       </svg>
+
+      {hoveredRow ? (
+        <div style={{ position: "absolute", top: 8, left: hovered != null && hovered > rows.length / 2 ? 12 : "auto", right: hovered != null && hovered > rows.length / 2 ? "auto" : 12, background: "rgba(8,17,31,.96)", border: "1px solid rgba(148,163,184,.24)", borderRadius: 12, padding: "10px 12px", minWidth: 190, pointerEvents: "none", boxShadow: "0 10px 30px rgba(0,0,0,.28)" }}>
+          <strong style={{ display: "block", fontSize: 12, marginBottom: 7 }}>{hoveredRow.month === "Hoy" ? `Hoy · ${exactDateLabel(hoveredRow.date)}` : exactDateLabel(hoveredRow.date)}</strong>
+          {series.map((s) => (
+            <div key={`tip-${s.key}`} style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 11, marginTop: 5 }}>
+              <span style={{ color: "var(--muted)" }}>{s.label}</span>
+              <b>{money(hoveredRow[s.key])}</b>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 4 }}>
         {series.map((s) => <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--muted)", fontSize: 12 }}><span style={{ width: 22, height: 3, borderRadius: 999, background: s.stroke, display: "inline-block" }} />{s.label}</div>)}
       </div>
@@ -130,6 +178,7 @@ export default function ProjectionCharts({ data }: { data: DashboardData }) {
   const debtRows = [
     {
       month: "Hoy",
+      date: data.local_date,
       totalProjectedCardDebt: Number(data.derived?.total_card_balance_pyg || 0),
       interestDebt: Number(data.derived?.interest_bearing_debt_estimate_pyg || 0),
       zeroInterestDebt: Number(data.derived?.zero_interest_future_installments_pyg || 0),
@@ -149,7 +198,7 @@ export default function ProjectionCharts({ data }: { data: DashboardData }) {
           { key: "zeroInterestDebt", label: "Cuotas futuras 0%", stroke: "#818cf8", dashed: true },
           { key: "interestDebt", label: "Deuda con interés", stroke: "var(--danger)" },
         ]} />
-        <p className="panel-note">Escenario: no crear nueva deuda neta, pagar hasta {money(p.debtTarget)} por mes a saldos no 0%, conservar {money(p.liquidityFloor)} de margen y mantener la reserva variable presupuestada. La deuda con interés se proyecta en 0 para {p.interestFreeMonth || "—"}.</p>
+        <p className="panel-note">Pasá el cursor sobre el gráfico para ver la fecha y el monto exactos. Escenario: no crear nueva deuda neta, pagar hasta {money(p.debtTarget)} por mes a saldos no 0%, conservar {money(p.liquidityFloor)} de margen y mantener la reserva variable presupuestada. La deuda con interés se proyecta en 0 para {p.interestFreeMonth || "—"}.</p>
       </article>
 
       <article className="panel" style={{ marginBottom: 0 }}>
@@ -161,7 +210,7 @@ export default function ProjectionCharts({ data }: { data: DashboardData }) {
           { key: "freeCash", label: "Dinero libre", stroke: "var(--success)" },
           { key: "debtPayment", label: "Pago de deuda", stroke: "var(--warning)", dashed: true },
         ]} />
-        <p className="panel-note">Cada mes recalcula automáticamente ingreso, gastos fijos activos, cuotas finitas, reserva variable y capacidad de saneamiento. Cuando agreguemos o eliminemos un gasto fijo en Supabase, esta proyección cambia sola.</p>
+        <p className="panel-note">Pasá el cursor sobre el gráfico para ver la fecha y el monto exactos. Cada mes recalcula automáticamente ingreso, gastos fijos activos, cuotas finitas, reserva variable y capacidad de saneamiento.</p>
       </article>
     </section>
   );
