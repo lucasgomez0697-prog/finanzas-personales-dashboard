@@ -1,18 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type DashboardData = any;
 
 const pyg = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
-const money = (value?: number | null) => `Gs. ${pyg.format(Number(value || 0))}`;
+const money = (value?: number | null) => value == null ? "Por confirmar" : `Gs. ${pyg.format(Number(value || 0))}`;
 
 function monthLabel(date: Date) {
   return date.toLocaleDateString("es-PY", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(".", "");
 }
 
 function exactDateLabel(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "Por confirmar";
   return new Date(`${value}T12:00:00Z`).toLocaleDateString("es-PY", {
     day: "2-digit",
     month: "2-digit",
@@ -173,6 +174,78 @@ function LineChart({ rows, series, maxValue }: { rows: any[]; series: ChartSerie
   );
 }
 
+const cardStatusLabel: Record<string, string> = {
+  no_debt: "✓ Sin deuda",
+  pending_statement: "Esperando extracto",
+  missing_due_date: "Falta vencimiento",
+  paid: "✓ Pagado",
+  upcoming: "● Vence pronto",
+  pending: "Pendiente",
+  overdue: "! Vencido",
+};
+
+function CardObligations({ data }: { data: DashboardData }) {
+  const cards = data.card_payment_schedule || [];
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
+        <div><span className="eyebrow">Tarjetas de crédito</span><b style={{ display: "block", marginTop: 4 }}>Pagos para evitar financiación</b></div>
+        <small style={{ color: "var(--muted)", textAlign: "right" }}>Se actualiza con cada extracto</small>
+      </div>
+      <div className="stack compact-stack">
+        {cards.map((card: any) => (
+          <div className="obligation-row" key={`monthly-card-${card.bank}`}>
+            <div className="obligation-main">
+              <b>{card.bank}</b>
+              <small>{card.due_date ? `Vencimiento: ${exactDateLabel(card.due_date)}` : "Vencimiento todavía no confirmado"}</small>
+            </div>
+            <div className="obligation-side">
+              <strong>{card.amount_to_avoid_interest_pyg == null ? "Por confirmar" : money(card.amount_to_avoid_interest_pyg)}</strong>
+              <span className={`badge badge-${card.payment_status || "neutral"}`}>{cardStatusLabel[card.payment_status] || card.payment_status || "—"}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MonthlyCardObligationsPortal({ data }: { data: DashboardData }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const heading = Array.from(document.querySelectorAll("h2")).find((node) => node.textContent?.trim() === "Obligaciones y banderas");
+    const panel = heading?.closest("article.panel") as HTMLElement | null;
+    if (!panel) return;
+
+    let mount = panel.querySelector("[data-card-obligations-portal]") as HTMLElement | null;
+    if (!mount) {
+      mount = document.createElement("div");
+      mount.setAttribute("data-card-obligations-portal", "true");
+      const note = panel.querySelector(".panel-note");
+      if (note) panel.insertBefore(mount, note);
+      else panel.appendChild(mount);
+    }
+    setTarget(mount);
+
+    const pill = panel.querySelector(".status-pill.compact");
+    if (pill) {
+      const fixedPaid = Number(data.obligation_summary?.paid_count || 0);
+      const fixedTracked = Number(data.obligation_summary?.tracked_count || 0);
+      const cardCount = (data.card_payment_schedule || []).length;
+      const cardSatisfied = (data.card_payment_schedule || []).filter((card: any) => ["no_debt", "paid"].includes(card.payment_status)).length;
+      pill.textContent = `${fixedPaid + cardSatisfied}/${fixedTracked + cardCount} cumplidas`;
+    }
+
+    return () => {
+      setTarget(null);
+      mount?.remove();
+    };
+  }, [data]);
+
+  return target ? createPortal(<CardObligations data={data} />, target) : null;
+}
+
 export default function ProjectionCharts({ data }: { data: DashboardData }) {
   const p = getProjectionSummary(data);
   const debtRows = [
@@ -187,31 +260,34 @@ export default function ProjectionCharts({ data }: { data: DashboardData }) {
   ];
 
   return (
-    <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 14, marginBottom: 14 }}>
-      <article className="panel" style={{ marginBottom: 0 }}>
-        <div className="panel-head">
-          <div><span className="eyebrow">Proyección</span><h2>Tendencia de deuda de tarjetas</h2></div>
-          <span className="status-pill compact">Saneamiento: {p.saneMonth || "por calcular"}</span>
-        </div>
-        <LineChart rows={debtRows} series={[
-          { key: "totalProjectedCardDebt", label: "Deuda total proyectada", stroke: "var(--accent)" },
-          { key: "zeroInterestDebt", label: "Cuotas futuras 0%", stroke: "#818cf8", dashed: true },
-          { key: "interestDebt", label: "Deuda con interés", stroke: "var(--danger)" },
-        ]} />
-        <p className="panel-note">Pasá el cursor sobre el gráfico para ver la fecha y el monto exactos. Escenario: no crear nueva deuda neta, pagar hasta {money(p.debtTarget)} por mes a saldos no 0%, conservar {money(p.liquidityFloor)} de margen y mantener la reserva variable presupuestada. La deuda con interés se proyecta en 0 para {p.interestFreeMonth || "—"}.</p>
-      </article>
+    <>
+      <MonthlyCardObligationsPortal data={data} />
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 14, marginBottom: 14 }}>
+        <article className="panel" style={{ marginBottom: 0 }}>
+          <div className="panel-head">
+            <div><span className="eyebrow">Proyección</span><h2>Tendencia de deuda de tarjetas</h2></div>
+            <span className="status-pill compact">Saneamiento: {p.saneMonth || "por calcular"}</span>
+          </div>
+          <LineChart rows={debtRows} series={[
+            { key: "totalProjectedCardDebt", label: "Deuda total proyectada", stroke: "var(--accent)" },
+            { key: "zeroInterestDebt", label: "Cuotas futuras 0%", stroke: "#818cf8", dashed: true },
+            { key: "interestDebt", label: "Deuda con interés", stroke: "var(--danger)" },
+          ]} />
+          <p className="panel-note">Pasá el cursor sobre la línea para ver la fecha y los montos exactos. Escenario: no crear nueva deuda neta, pagar hasta {money(p.debtTarget)} por mes a saldos no 0%, conservar {money(p.liquidityFloor)} de margen y mantener la reserva variable presupuestada. La deuda con interés se proyecta en 0 para {p.interestFreeMonth || "—"}.</p>
+        </article>
 
-      <article className="panel" style={{ marginBottom: 0 }}>
-        <div className="panel-head">
-          <div><span className="eyebrow">Proyección</span><h2>Dinero libre después de compromisos</h2></div>
-          <span className="status-pill compact">Próximo mes: {money(p.nextMonthFree)}</span>
-        </div>
-        <LineChart rows={p.months} series={[
-          { key: "freeCash", label: "Dinero libre", stroke: "var(--success)" },
-          { key: "debtPayment", label: "Pago de deuda", stroke: "var(--warning)", dashed: true },
-        ]} />
-        <p className="panel-note">Pasá el cursor sobre el gráfico para ver la fecha y el monto exactos. Cada mes recalcula automáticamente ingreso, gastos fijos activos, cuotas finitas, reserva variable y capacidad de saneamiento.</p>
-      </article>
-    </section>
+        <article className="panel" style={{ marginBottom: 0 }}>
+          <div className="panel-head">
+            <div><span className="eyebrow">Proyección</span><h2>Dinero libre después de compromisos</h2></div>
+            <span className="status-pill compact">Próximo mes: {money(p.nextMonthFree)}</span>
+          </div>
+          <LineChart rows={p.months} series={[
+            { key: "freeCash", label: "Dinero libre", stroke: "var(--success)" },
+            { key: "debtPayment", label: "Pago de deuda", stroke: "var(--warning)", dashed: true },
+          ]} />
+          <p className="panel-note">Pasá el cursor sobre la línea para ver la fecha y los montos exactos. Cada mes recalcula automáticamente ingreso, gastos fijos activos, cuotas finitas, reserva variable y capacidad de saneamiento.</p>
+        </article>
+      </section>
+    </>
   );
 }
