@@ -1,4 +1,5 @@
 import AutoRefresh from "./auto-refresh";
+import ProjectionCharts, { getProjectionSummary } from "./projection-charts";
 
 type DashboardData = any;
 
@@ -114,6 +115,7 @@ export default async function Home() {
   const s = data.snapshot || {};
   const d = data.derived || {};
   const cash = data.cash_flow || {};
+  const projection = getProjectionSummary(data);
   const categories = Object.entries(data.monthly_by_category || {}).sort((a: any, b: any) => Number(b[1]) - Number(a[1]));
   const maxCategory = Math.max(...categories.map(([, v]: any) => Number(v)), 1);
   const emergency = (data.goals || []).find((g: any) => String(g.name || "").toLowerCase().includes("emergencia"));
@@ -142,7 +144,7 @@ export default async function Home() {
         <Metric label="Liquidez actual" value={money(data.liquidity?.liquid_pyg || s.current_liquidity_pyg)} note="Efectivo disponible hoy" />
         <Metric label="Caja proyectada al próximo cobro" value={money(cash.projected_after_fixed_pyg)} note={`${money(cash.fixed_due_before_next_income_pyg)} de fijos antes del ${shortDate(nextIncome?.next_date)}`} tone={cashTone} />
         <Metric label="Próximo cobro" value={money(nextIncome?.amount)} note={`${nextIncome?.name || "Ingreso"} · ${dateLabel(nextIncome?.next_date)}`} />
-        <Metric label="Dinero libre estimado / mes" value={money(d.monthly_free_estimate_pyg)} note="Ingreso mensual − fijos brutos − gasto variable registrado" />
+        <Metric label="Dinero libre estimado / mes" value={money(projection.nextMonthFree)} note="Próximo mes · luego de fijos, reserva variable y plan de saneamiento" />
         <Metric label="Deuda total tarjetas" value={money(d.total_card_balance_pyg)} note="Itaú + Sudameris + Ueno + Continental" />
         <Metric label="Deuda con interés estimada" value={`~${money(d.interest_bearing_debt_estimate_pyg)}`} note="Estimación actual; intereses de liquidación pueden variar" tone={Number(d.interest_bearing_debt_estimate_pyg || 0) > 0 ? "danger" : "good"} />
         <Metric label="Pagarés CIT pendientes" value={money(d.cit_pagare_remaining_pyg)} note={`${number(data.cit_pagare?.remaining_payments)} pagarés × ${money(data.cit_pagare?.unit_amount_pyg)}`} />
@@ -152,6 +154,8 @@ export default async function Home() {
         <Metric label="Ahorro del mes" value={money(d.savings_month_pyg)} note={`Tasa de ahorro ${pct(d.savings_rate_pct)}`} />
         <Metric label="Compromisos fijos / ingreso" value={pct(d.recurring_commitment_ratio_pct)} note={`${money(s.recurring_gross_pyg)} sobre ${money(s.monthly_cash_income_pyg)}`} />
       </section>
+
+      <ProjectionCharts data={data} />
 
       <section className="two-col">
         <article className="panel">
